@@ -18,6 +18,7 @@ import qualified Data.Map as M            --container
 import qualified Data.Time as Time        --time
 import qualified Parser.ChartParser as CP
 import qualified Parser.Japanese.MyLexicon as LEX
+import qualified Parser.Japanese.Lexicon (wholeLexicon)
 import qualified Interface as I
 import qualified Interface.Text as T
 import qualified JSeM as J
@@ -31,6 +32,7 @@ data Options =
   Version
   | Stat
   | Test
+  | DumpDict
   | Options Command ParseInput FilePath Int Int Bool
     deriving (Show, Eq)
 
@@ -90,6 +92,9 @@ optionParser =
              <> hidden 
              <> internal
              <> help "Execute the test code" )
+  <|>
+  flag' DumpDict (long "dumpdict"
+                 <> help "dump dictionary")
   <|> 
   Options
     <$> subparser 
@@ -185,6 +190,7 @@ lightblueMain :: Options -> IO()
 lightblueMain Version = showVersion
 lightblueMain Stat = showStat
 lightblueMain Test = test
+lightblueMain DumpDict = dumpDict
 lightblueMain (Options commands input filepath nbest beamw iftime) = do
   start <- Time.getCurrentTime
   contents <- case filepath of
@@ -320,6 +326,14 @@ showStat = do
   putStr "  "
   putStr $ show $ length $ T.lines jumandic
   putStrLn " lexical entries for open words from JUMAN++"
+
+
+-- | lightblue --dumpdict
+-- |
+dumpDict :: IO()
+dumpDict = do
+  let lexes = LEX.wholeLexicon
+  putStrLn lexes
 
 -- | lightblue --test
 -- | 

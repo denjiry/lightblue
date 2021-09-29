@@ -16,6 +16,7 @@ module Parser.Japanese.Lexicon (
   --isCONJ,
   lookupLexicon,
   setupLexicon,
+  wholeLexicon,
   LEX.emptyCategories,
   LEX.myLexicon
   ) where
@@ -56,6 +57,25 @@ setupLexicon sentence = do
   let propernames = map (\(hyoki, (daihyo,score')) -> lexicalitem hyoki "(PN)" score' ((T True 1 modifiableS `SL` (T True 1 modifiableS `BS` NP [F[Nc]]))) (properNameSR daihyo)) $ M.toList pn
   --  5. 1+2+3+4
   let numeration = jumandicParsed ++ mylexiconFiltered ++ commonnouns ++ propernames ++ jumanCN
+  return $ numeration `seq` numeration
+
+-- | This function provide whole Lexicon
+wholeLexicon :: IO(LexicalItems)
+wholeLexicon = do
+  --  1. Setting up lexical items provided by JUMAN++
+  lightbluepath <- E.getEnv "LIGHTBLUE"
+  jumandic <- T.readFile $ lightbluepath ++ "src/Parser/Japanese/Juman.dic"
+  let jumandicFiltered = map (T.split (=='\t')) (T.lines jumandic)
+  let (jumandicParsed,(cn,pn)) = L.foldl' parseJumanLine ([],(M.empty,M.empty)) $ jumandicFiltered
+  --  2. Setting up private lexicon
+  let mylexiconFiltered = LEX.myLexicon
+  --  3. Setting up compound nouns (returned from an execution of JUMAN)
+  -- jumanCN <- JU.jumanCompoundNouns (T.replace "―" "、" sentence)
+  --  4. Accumulating common nons and proper names entries
+  let commonnouns = map (\(hyoki, (daihyo,score')) -> lexicalitem hyoki "(CN)" score' N (commonNounSR daihyo)) $ M.toList cn
+  let propernames = map (\(hyoki, (daihyo,score')) -> lexicalitem hyoki "(PN)" score' ((T True 1 modifiableS `SL` (T True 1 modifiableS `BS` NP [F[Nc]]))) (properNameSR daihyo)) $ M.toList pn
+  --  5. 1+2+3+4
+  let numeration = jumandicParsed ++ mylexiconFiltered ++ commonnouns ++ propernames
   return $ numeration `seq` numeration
 
 -- | Read each line in "Juman.dic" and convert it to a CCG lexical item
