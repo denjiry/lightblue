@@ -27,6 +27,7 @@ import qualified DTS.UDTT as DTS
 --import qualified DTS.Prover.TypeChecker as TC
 import qualified DTS.Prover as Prover
 import qualified DTS.DTStoProlog as D2P
+import qualified Data.Aeson as AE
 
 data Options =
   Version
@@ -332,8 +333,8 @@ showStat = do
 -- |
 dumpDict :: IO()
 dumpDict = do
-  let lexes = LEX.wholeLexicon
-  putStrLn lexes
+  let lexes = LEX.myLexicon
+  putStrLn $ show $ AE.encode lexes
 
 -- | lightblue --test
 -- | 

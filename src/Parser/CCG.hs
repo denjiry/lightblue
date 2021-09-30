@@ -1,5 +1,5 @@
 {-# OPTIONS -Wall #-}
-{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances, DeriveGeneric #-}
 
 {-|
 Module      : Parser.CCG
@@ -37,6 +37,7 @@ module Parser.CCG (
   ) where
 
 import Prelude hiding (id)
+import GHC.Generics
 import qualified Data.Text.Lazy as T --text
 import qualified Data.List as L      --base
 import qualified Data.Maybe as Maybe --base
@@ -46,6 +47,7 @@ import DTS.UDTT
 import Interface.Text
 import Interface.TeX
 import Interface.HTML
+import Data.Aeson (ToJSON)
 
 -- | A node in CCG derivation tree.
 data Node = Node {
@@ -57,7 +59,9 @@ data Node = Node {
   daughters :: [Node], -- ^ The daughter nodes
   score :: Rational,   -- ^ The score (between 0.00 to 1.00, larger the better)
   source :: T.Text    -- ^ The source of the lexical entry
-  } deriving (Eq)
+  } deriving (Eq, Generic)
+
+instance ToJSON Node where
 
 instance Show Node where
   show = T.unpack . toText
