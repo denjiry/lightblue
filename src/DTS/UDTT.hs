@@ -1,5 +1,6 @@
 {-# OPTIONS -Wall #-}
 {-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 {-|
 Copyright   : (c) Daisuke Bekki, 2016
@@ -51,10 +52,14 @@ import qualified DTS.UDTTwithName as VN
 import Interface.Text
 import Interface.TeX
 import Interface.HTML
+import Data.Aeson (ToJSON)
+import GHC.Generics (Generic)
 
 -- | 'Proj' 'Fst' m is the first projection of m,
 -- while 'Proj' 'Snd' m is the second projection of m.
-data Selector = Fst | Snd deriving (Eq, Show)
+data Selector = Fst | Snd deriving (Eq, Show, Generic)
+
+instance ToJSON Selector where
 
 -- | translates a selector into either 1 or 2.
 instance SimpleText Selector where
@@ -92,7 +97,9 @@ data Preterm =
   | Refl Preterm Preterm           -- ^ refl
   | Idpeel Preterm Preterm         -- ^ idpeel
   -- DRel Int T.Text Preterm Preterm  -- ^ Discourse relations
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance ToJSON Preterm where
 
 instance Show Preterm where
   --show = T.unpack . toTextDeBruijn

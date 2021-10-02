@@ -111,7 +111,10 @@ data Cat =
   | RPAREN           -- ^ A category for right parentheses
   | SL Cat Cat       -- ^ X/Y
   | BS Cat Cat       -- ^ X\\Y
-  | T Bool Int Cat   -- ^ Category variables, where Int is an index, Cat is a restriction for its head. 
+  | T Bool Int Cat   -- ^ Category variables, where Int is an index, Cat is a restriction for its head.
+  deriving (Generic)
+
+instance ToJSON Cat
 
 -- | checks if given two categories can be coordinated.
 instance Eq Cat where
@@ -218,7 +221,9 @@ instance MathML Cat where
 data Feature = 
   F [FeatureValue]        -- ^ Syntactic feature
   | SF Int [FeatureValue] -- ^ Shared syntactic feature (with an index)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance ToJSON Feature
 
 -- | Values of syntactic features of Japanese 
 data FeatureValue =
@@ -238,7 +243,9 @@ data FeatureValue =
   Nc | Ga | O | Ni | To | Niyotte | No |
   ToCL | YooniCL |
   Decl 
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance ToJSON FeatureValue
 
 instance Show FeatureValue where
   show V5k = "v:5:k"
@@ -500,7 +507,9 @@ data RuleSymbol =
   | WRAP  -- ^ Wrap rule
   | DC    -- ^ Dynamic conjunction rule
   | DREL  -- ^ Discourse Relation rule
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance ToJSON RuleSymbol
 
 -- | The simple-text representation of the rule symbols.
 instance SimpleText RuleSymbol where
