@@ -334,7 +334,7 @@ showStat = do
 dumpDict :: IO()
 dumpDict = do
   let lexes = LEX.myLexicon
-  putStrLn $ show $ AE.encode lexes
+  AE.encodeFile "./myLexicon.json" lexes
 
 -- | lightblue --test
 -- | 
