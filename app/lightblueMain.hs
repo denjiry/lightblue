@@ -28,6 +28,7 @@ import qualified DTS.UDTT as DTS
 import qualified DTS.Prover as Prover
 import qualified DTS.DTStoProlog as D2P
 import qualified Data.Aeson as AE
+import Parser.Japanese.Lexicon (wholeLexicon)
 
 data Options =
   Version
@@ -333,7 +334,8 @@ showStat = do
 -- |
 dumpDict :: IO()
 dumpDict = do
-  let lexes = LEX.myLexicon
+  -- let lexes = LEX.myLexicon
+  lexes <- wholeLexicon
   AE.encodeFile "./myLexicon.json" lexes
 
 -- | lightblue --test
