@@ -1,5 +1,6 @@
 {-# OPTIONS -Wall #-}
 {-# LANGUAGE OverloadedStrings, DeriveGeneric, DefaultSignatures #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 {-|
 Module      : Parser.Japanese.Lexicon
@@ -32,13 +33,15 @@ import qualified Parser.Japanese.CallJuman as JU
 import qualified Parser.Japanese.MyLexicon as LEX
 import Parser.Japanese.Templates
 import DTS.UDTT
+import Data.HashMap (Map, lookup, empty, insertWith)
+import qualified Data.Maybe
 
 -- | Lexicon consists of a set of CCG Nodes
-type LexicalItems = [Node]
+type LexicalItems = Map T.Text [Node]
 
 -- | This function takes a word and a lexicon and returns a set of CCG lexical entries whose PF is that word.
 lookupLexicon :: T.Text -> LexicalItems -> [Node]
-lookupLexicon word lexicon = filter (\l -> (pf l) == word) lexicon
+lookupLexicon word lexicon =  Data.Maybe.fromMaybe [] (Data.HashMap.lookup word lexicon)
 
 -- | This function takes a sentence and returns a numeration needed to parse that sentence, i.e., a union of 
 setupLexicon :: T.Text -> IO(LexicalItems)
@@ -57,10 +60,14 @@ setupLexicon sentence = do
   let propernames = map (\(hyoki, (daihyo,score')) -> lexicalitem hyoki "(PN)" score' ((T True 1 modifiableS `SL` (T True 1 modifiableS `BS` NP [F[Nc]]))) (properNameSR daihyo)) $ M.toList pn
   --  5. 1+2+3+4
   let numeration = jumandicParsed ++ mylexiconFiltered ++ commonnouns ++ propernames ++ jumanCN
-  return $ numeration `seq` numeration
+  let collectedNode =  numeration `seq` numeration
+  return $ nodeList2HashMap collectedNode
+
+nodeList2HashMap :: [Node] -> LexicalItems
+nodeList2HashMap = foldl (\buildedMap node -> Data.HashMap.insertWith (++) (pf node) [node] buildedMap ) Data.HashMap.empty
 
 -- | This function provide whole Lexicon
-wholeLexicon :: IO(LexicalItems)
+wholeLexicon :: IO([Node])
 wholeLexicon = do
   --  1. Setting up lexical items provided by JUMAN++
   lightbluepath <- E.getEnv "LIGHTBLUE"
