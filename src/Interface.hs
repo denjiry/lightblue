@@ -39,6 +39,7 @@ import qualified DTS.Prover as Prover
 import qualified DTS.Prover.Judgement as Ty
 --import qualified Classifier.DiscourseRelation as DR
 import qualified Interface.SVG as SVG
+import qualified Data.HashMap as HM
 
 {- Some functions for pretty printing Chart/Nodes -}
 
@@ -173,7 +174,7 @@ printLexicalItem style node = case style of
 printNumeration :: S.Handle -> Style -> T.Text -> IO()
 printNumeration handle style sentence = do
   numeration <- LEX.setupLexicon sentence
-  mapM_ ((T.hPutStrLn handle) . (printLexicalItem style)) numeration
+  mapM_ ((T.hPutStrLn handle) . (printLexicalItem style)) $ concat $ HM.elems numeration
 
 -- | parses sentences in the given corpus and yields a list of SRs in HTML format.
 treebankBuilder :: Int -> [T.Text] -> IO()
