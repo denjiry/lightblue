@@ -35,6 +35,7 @@ data Options =
   | Stat
   | Test
   | DumpDict
+  | Server
   | Options Command ParseInput FilePath Int Int Bool
     deriving (Show, Eq)
 
@@ -193,6 +194,7 @@ lightblueMain Version = showVersion
 lightblueMain Stat = showStat
 lightblueMain Test = test
 lightblueMain DumpDict = dumpDict
+lightblueMain Server = lightblueServer
 lightblueMain (Options commands input filepath nbest beamw iftime) = do
   start <- Time.getCurrentTime
   contents <- case filepath of
@@ -337,6 +339,11 @@ dumpDict = do
   -- let lexes = LEX.myLexicon
   lexes <- wholeLexicon
   AE.encodeFile "./myLexicon.json" lexes
+
+lightblueServer::IO()
+lightblueServer = do
+  line <- getLine
+  return ()
 
 -- | lightblue --test
 -- | 
