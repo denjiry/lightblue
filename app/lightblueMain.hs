@@ -28,6 +28,7 @@ import qualified DTS.UDTT as DTS
 import qualified DTS.Prover as Prover
 import qualified DTS.DTStoProlog as D2P
 import qualified Data.Aeson as AE
+import qualified Data.HashMap as HM
 import Parser.Japanese.Lexicon (wholeLexicon)
 
 data Options =
@@ -337,8 +338,8 @@ showStat = do
 dumpDict :: IO()
 dumpDict = do
   -- let lexes = LEX.myLexicon
-  lexes <- wholeLexicon
-  AE.encodeFile "./myLexicon.json" lexes
+  lexes <-  wholeLexicon
+  AE.encodeFile "./myLexicon.json" $ HM.elems lexes
 
 lightblueServer::IO()
 lightblueServer = do

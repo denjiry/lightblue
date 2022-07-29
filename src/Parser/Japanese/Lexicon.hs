@@ -67,7 +67,7 @@ nodeList2HashMap :: [Node] -> LexicalItems
 nodeList2HashMap = foldl (\buildedMap node -> Data.HashMap.insertWith (++) (pf node) [node] buildedMap ) Data.HashMap.empty
 
 -- | This function provide whole Lexicon
-wholeLexicon :: IO([Node])
+wholeLexicon :: IO LexicalItems
 wholeLexicon = do
   --  1. Setting up lexical items provided by JUMAN++
   lightbluepath <- E.getEnv "LIGHTBLUE"
@@ -83,7 +83,7 @@ wholeLexicon = do
   let propernames = map (\(hyoki, (daihyo,score')) -> lexicalitem hyoki "(PN)" score' ((T True 1 modifiableS `SL` (T True 1 modifiableS `BS` NP [F[Nc]]))) (properNameSR daihyo)) $ M.toList pn
   --  5. 1+2+3+4
   let numeration = jumandicParsed ++ mylexiconFiltered ++ commonnouns ++ propernames
-  return $ numeration `seq` numeration
+  return $ nodeList2HashMap numeration
 
 -- | Read each line in "Juman.dic" and convert it to a CCG lexical item
 -- | Meanwhile, common nouns and proper names that have a same phonetic form are to be bundled together into a single word.

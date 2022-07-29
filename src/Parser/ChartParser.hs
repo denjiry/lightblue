@@ -48,6 +48,17 @@ parse beam sentence
       let (chart,_,_,_) = T.foldl' (chartAccumulator beam lexicon) (M.empty,[0],0,T.empty) (purifyText sentence)
       return chart
 
+-- | Parseing function on server mode
+serverParse :: Int -> L.LexicalItems -> T.Text -> IO [CCG.Node]
+serverParse beam lexicon sentence
+  | sentence == T.empty = return [] -- returns an empty chart, otherwise foldl returns a runtime error when text is empty
+  | otherwise = do
+      let (chart,_,_,_) = T.foldl' (chartAccumulator beam lexicon) (M.empty,[0],0,T.empty) (purifyText sentence)
+      case extractParseResult beam chart of
+        Full nodes -> return nodes
+        Partial nodes -> return nodes
+        Failed -> return []
+
 -- | removes occurrences of non-letters from an input text.
 purifyText :: T.Text -> T.Text
 purifyText text = 
