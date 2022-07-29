@@ -33,6 +33,7 @@ dependencies:
   - split
   - aeson
   - hashmap
+  - bytestring
 
 library:
   source-dirs: src

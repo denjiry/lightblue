@@ -18,6 +18,7 @@ module Parser.ChartParser (
   -- * Main parsing functions
   parse,
   simpleParse,
+  serverParse,
   -- * Partial parsing function(s)
   ParseResult(..),
   extractParseResult,

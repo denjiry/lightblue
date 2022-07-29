@@ -29,7 +29,8 @@ import qualified DTS.Prover as Prover
 import qualified DTS.DTStoProlog as D2P
 import qualified Data.Aeson as AE
 import qualified Data.HashMap as HM
-import Parser.Japanese.Lexicon (wholeLexicon)
+import Parser.Japanese.Lexicon (wholeLexicon, LexicalItems)
+import qualified Data.ByteString.Lazy.Char8 as BL
 
 data Options =
   Version
@@ -99,6 +100,10 @@ optionParser =
   <|>
   flag' DumpDict (long "dumpdict"
                  <> help "dump dictionary")
+  <|>
+  flag' Server (long "server"
+               <> short 's'
+               <> help "persing server mode")
   <|> 
   Options
     <$> subparser 
@@ -341,10 +346,23 @@ dumpDict = do
   lexes <-  wholeLexicon
   AE.encodeFile "./myLexicon.json" $ HM.elems lexes
 
+-- | lightblue --server, -s
+-- |
 lightblueServer::IO()
 lightblueServer = do
-  line <- getLine
+  lexicon <- wholeLexicon
+  serverMain 10 lexicon
   return ()
+
+serverMain :: Int -> LexicalItems -> IO ()
+serverMain beam lexicon = do
+  line <- T.getLine
+  nodes <- CP.serverParse beam lexicon line
+  BL.putStrLn $ AE.encode nodes
+  if line == T.empty then
+    return ()
+    else
+    serverMain beam lexicon
 
 -- | lightblue --test
 -- | 
