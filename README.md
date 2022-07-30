@@ -102,6 +102,21 @@ $ lightblue --help
 $ lightblue --version
 $ lightblue --stat
 ```
+#### Server mode
+Server mode provide:
+
+- little latency parsing (comparing to normal mode (`$ lightblue parse`))
+- programmable using friendly (input plain text and receive all `[CCG.Node]` in **json format**) using [aeson](https://hackage.haskell.org/package/aeson)
+
+You can start with:
+
+1. launch server:
+`$ stack run -- --server (or -s) or $ lightblue --server (or -s)`
+1. initially construct a hashmap of the lexicon and you must wait about 9 seconds for server accepting your input
+1. input a sentence & Enter key through stdin (internally using `getLine`)
+1. parse a input sentence, then output result `[CCG.Node]` in json format to stdout
+1. return 3., wait stdin again
+1. exit when the input is empty line or `EoF (End of File)`
 
 ### For developpers ###
 Installing Haskell-mode for Emacs will help.
