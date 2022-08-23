@@ -29,7 +29,7 @@ import qualified DTS.Prover as Prover
 import qualified DTS.DTStoProlog as D2P
 import qualified Data.Aeson as AE
 import qualified Data.HashMap as HM
-import Parser.Japanese.Lexicon (wholeLexicon, LexicalItems)
+import Parser.Japanese.Lexicon (wholeLexicon, LexicalItems, setupLexicon)
 import qualified Data.ByteString.Lazy.Char8 as BL
 
 data Options =
@@ -279,7 +279,8 @@ lightblueMain (Options commands input filepath nbest beamw iftime) = do
       mapM_
         --(\(sid,sentence) -> do
         (\(_,sentence) -> do
-          chart <- CP.parse beamw sentence
+          lexicon <- setupLexicon (T.replace "―" "。" sentence)
+          chart <- CP.parse beamw lexicon sentence
           --let filterednodes = concat $ map snd $ filter (\((x,y),_) -> i <= x && y <= j) $ M.toList chart
           --I.printNodes S.stdout I.HTML sid sentence False filterednodes
           mapM_ (\((x,y),node) -> do
@@ -357,7 +358,11 @@ lightblueServer = do
 serverMain :: Int -> LexicalItems -> IO ()
 serverMain beam lexicon = do
   line <- T.getLine
-  nodes <- CP.serverParse beam lexicon line
+  chart <- CP.parse beam lexicon line
+  nodes <- case CP.extractParseResult beam chart of
+    CP.Full  nodes -> return nodes
+    CP.Partial nodes -> return nodes
+    CP.Failed -> return []
   BL.putStrLn $ AE.encode nodes
   if line == T.empty then
     return ()
@@ -410,7 +415,8 @@ parseSentence beam score sentence = do
   (i,j,k,total) <- score
   S.putStr $ "[" ++ show (total+1) ++ "] "
   T.putStrLn sentence
-  chart <- CP.parse beam sentence
+  lexicon <- setupLexicon (T.replace "―" "。" sentence)
+  chart <- CP.parse beam lexicon sentence
   case CP.extractParseResult beam chart of
     CP.Full nodes -> 
        do

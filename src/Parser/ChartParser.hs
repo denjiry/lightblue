@@ -18,7 +18,6 @@ module Parser.ChartParser (
   -- * Main parsing functions
   parse,
   simpleParse,
-  serverParse,
   -- * Partial parsing function(s)
   ParseResult(..),
   extractParseResult,
@@ -40,25 +39,14 @@ type Chart = M.Map (Int,Int) [CCG.Node]
 
 -- | Main parsing function to parse a Japanees sentence and generates a CYK-chart.
 parse :: Int           -- ^ The beam width
+         -> L.LexicalItems  -- ^ Lexicon 
          -> T.Text     -- ^ A sentence to be parsed
          -> IO(Chart) -- ^ A pair of the resulting CYK-chart and a list of CYK-charts for segments
-parse beam sentence 
+parse beam lexicon sentence 
   | sentence == T.empty = return M.empty -- returns an empty chart, otherwise foldl returns a runtime error when text is empty
   | otherwise = do
-      lexicon <- L.setupLexicon (T.replace "―" "。" sentence)
       let (chart,_,_,_) = T.foldl' (chartAccumulator beam lexicon) (M.empty,[0],0,T.empty) (purifyText sentence)
       return chart
-
--- | Parseing function on server mode
-serverParse :: Int -> L.LexicalItems -> T.Text -> IO [CCG.Node]
-serverParse beam lexicon sentence
-  | sentence == T.empty = return [] -- returns an empty chart, otherwise foldl returns a runtime error when text is empty
-  | otherwise = do
-      let (chart,_,_,_) = T.foldl' (chartAccumulator beam lexicon) (M.empty,[0],0,T.empty) (purifyText sentence)
-      case extractParseResult beam chart of
-        Full nodes -> return nodes
-        Partial nodes -> return nodes
-        Failed -> return []
 
 -- | removes occurrences of non-letters from an input text.
 purifyText :: T.Text -> T.Text
@@ -192,7 +180,8 @@ checkEmptyCategories prevlist =
 -- | Simple parsing function to return just the best node for a given sentence
 simpleParse :: Int -> T.Text -> IO([CCG.Node])
 simpleParse beam sentence = do
-  chart <- parse beam sentence
+  lexicon <- L.setupLexicon (T.replace "―" "。" sentence)
+  chart <- parse beam lexicon sentence
   case extractParseResult beam chart of
     Full nodes -> return nodes
     Partial nodes -> return nodes
