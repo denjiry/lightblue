@@ -2,9 +2,7 @@
 ## What is this repository for?
 
 * *lightblue* is a Japanese CCG parser with DTS representations
-* Current version: 0.2.0.0
 * Copyright owner: Daisuke Bekki
-
 
 ## Installing lightblue
 ### Prerequisite 1: Haskell Stack
@@ -18,83 +16,63 @@ $ brew install haskell-stack
 ```
 See https://docs/haskellstack.org/en/stable/README/#how-to-install for details.
 
-### Prerequisite 2: command-line tools
-The followint tools must be installed before executing *lightblue*.
+### Prerequisite 2: Installation of morphological analyzer (KWJA or Juman/Jumanpp)
+One of the following Japanese morphological analyzers must be installed before executing *lightblue*.
 
-  1. [JUMAN (a User-Extensible Morphological Analyzer for Japanese)](http://nlp.ist.i.kyoto-u.ac.jp/EN/index.php?JUMAN) (>= version 7.0)
-  1. tidy (only for prettyprinting XML outputs)
-    * Debian: `sudo apt-get install tidy`
-    * Mac: `sudo port install tidy`
+- [KWJA](https://github.com/ku-nlp/kwja)
 
-[//]: # (1. blas and lapack )
-[//]: # (`sudo apt-get install libblas-dev liblapack-dev` )
+- [JUMAN](http://nlp.ist.i.kyoto-u.ac.jp/EN/index.php?JUMAN) (>= version 7.0) 
+
+- [JUMAN++](https://nlp.ist.i.kyoto-u.ac.jp/?JUMAN%2B%2B) 
 
 ### Download lightblue
 Do the following in the directory under which you'd like to install *lightblue*.
 ```
-$ git clone git@bitbucket.org:DaisukeBekki/lightblue.git
+$ git clone --depth=1 https://github.com/DaisukeBekki/lightblue.git
 ```
-This operation will create the directory *lightblue* (henceforth we will refer to this directory as <lightblue>) under the current directory.
+This operation will create, under the current directory, a new directory *lightblue*.  Henceforth we will refer to the full path to this directory as &lt;lightblue&gt;.
 
 ### Configuration and Installation
-You need to add the environment variable LIGHTBLUE and set its value as <lightblue>.  You may add the line `export LIGHTBLUE=<lightblue>` to .bashrc, .bash.profile, .bash_profile, or whatever configuration file for your shell.  Then move to <lightblue> and:
+You need to add the environment variable LIGHTBLUE and set its value as &lt;lightblue&gt;.  You may add the line `export LIGHTBLUE=<lightblue>` to .bashrc, .bash.profile, .bash_profile, or whatever configuration file for your shell.  Then move to &lt;lightblue&gt; and do the following:
 ```
 $ cd <lightblue>
-$ stack setup
 $ stack build
 ```
 
-### How to run
-Set the permission of two shell scripts `lightblue` and `tidy` to executable.
+Set the permission of the shell scripts `lightblue` to executable.
 ```
 $ chmod 755 lightblue
-$ chmod 755 tidy
 ```
 
-To parse a Japanese sentence and get a text|HTML|TeX|XML representation, execute:
+## Running lightblue
+### Quick Start
+
+To parse a Japanese sentence and get a parsing result in a text format, execute:
 ```
-$ echo 太郎がパンを食べた。 | ./lightblue parse -s {text|html|tex}
-```
-or
-```
-$ echo 太郎がパンを食べた。 | ./lightblue parse -s xml | ./tidy
+$ echo 太郎がパンを食べた。 | ./lightblue parse -s text
 ```
 
-With '-n|--nbest' option, *lightblue* will show the N-best parse results.
-
-With '--time' option, *lightblue* will show the execution time for parsing.
-
-*lightblue* can be used as a part-of-speech tagger when the `-o postag` option is specified:
+To see a parsing result in HTML formal, execute (choose your browser):
 ```
-$ echo 太郎がパンを食べた。 | ./lightblue parse -o postag
+$ echo 太郎がパンを食べた。 | ./lightblue parse -s html > result.html; firefox result.html
 ```
 
-The following command shows the list of lexical items prepared for pasing the given sentence:
+If you have a text file (one sentence per line) &lt;corpusfile&gt;, then you can feed its path to *lightblue* by:
 ```
-$ echo 太郎がパンを食べた。| ./lightblue parse -o numeration
-```
-
-If you have a text file (one sentence per line) <corpusfile>, then you can feed it to *lightblue* by:
-```
-$ ./lightblue demo -f <corpusfile>
+$ ./lightblue parse -s html -f <corpusfile>
 ```
 
 To parse a JSeM file and execute inferences therein, then you can feed it to *lightblue* by:
 ```
-$ ./lightblue infer -i jsem -f <jsemfile>
+$ ./lightblue jsem -f <jsemfile>
 ```
 
-To check the inference relations <premise_1>, ..., <premise_n> |- <hypothesis>, simply execute:
+### Usage
+The syntax of the lightblue command is as follows:
 ```
-$ ./lightblue infer -f <filename>
+./lightblue <command> <local options> <global options>
 ```
-where <filename> is the path of a text file, consisting of premises and a hypothesis with one sentence per each line:
-```
-<premise_1>
-...
-<premise_n>
-<hypothesis>
-```
+
 
 Check also:
 ```
@@ -118,10 +96,49 @@ You can start with:
 1. return 3., wait stdin again
 1. exit when the input is empty line or `EoF (End of File)`
 
+|Command         |                                                                       |
+|:---------------|:----------------------------------------------------------------------|
+|```parse```     |Parse Sentences and returns parsing results.                           |
+|```jsem```      |Parse a JSeM file and execute inferences.                              |
+|```numeration```|Shows the list of lexical items prepared for parsing the given sentence|
+|```version```   |Print the lightblue version.                                           |
+|```stat```      |Print the lightblue statistics.                                        |
+
+Each of ```parse ``` and ```jsem``` commands has a set of local options.
+
+|Local Options for ```parse```                     |Default   |Description                                                    |  
+|:-------------------------------------------------|:---------|:--------------------------------------------------------------|
+|```-o``` or ```--output {tree\|postag}```         |```tree```|Specify the output content.<br>```tree```: Outputs parse trees and their type check results.<br> ```postag```: Outputs only lexical items (Use lightblue a part-of-speech tagger) |
+|```-p``` or ```--prover {Wani\|Null}```           |```Wani```|Choose a prover.<br>```Wani```: Use Wani prover (Daido and Bekki 2020)<br>```None```: Use the null prover (that always returns no diagrams).|
+
+|Local Options for ```jsem```                      |Default   |Description                           |  
+|:-------------------------------------------------|:---------|:-------------------------------------|
+|```-p``` or ```--prover {Wani\|Null}```           |```Wani```|Choose a prover.<br>```Wani```: Use Wani prover (Daido and Bekki 2020)<br>```None```: Use the null prover (that always returns no diagrams).|
+|```--jsemid <text>```                             |```all``` |Skip JSeM data the JSeM ID of which is not equial to this value.           |
+|```--nsample <int>```                             |```-1```  |Specify a number of JSeM data to process (A negative value means all data) |
+
+The global options are common to all commands.
+
+|Global Options                                    |Default   |Description                                                     |
+|:------------------------------------------------|:---------|:---------------------------------------------------------------|
+|```-s``` or ```--style {text\|tex\|xml\|html}``` |```text```|Show results in the specified format.                     |
+|```-f``` or ```--file <filepath>```              |          |Read input texts from <filepath><br>(Specify '-' to use stdin) |
+|```-m``` or ```--ma {juman\|jumanpp\|kwja}```    |```kwja```|Specify morphological analyzer (default: KWJA)                  |
+|```-b``` or ```--beam <int>```                   |```32```  |Set the beam width to <int>                                     |
+|```--nparse <int>```                             |```-1```  |Search only N-best parse trees for each sentence (A negative value means all trees) |                      |
+|```--ntypecheck <int>```                         |```-1```  |Search only N-best diagrams for each type checking of a logical form (A negative value means all diagrams) |
+|```--nproof <int>```                             |```-1```  |Search only N-best diagrams for each proof search (A negative value means all diagrams) |
+|```--maxdepth <int>```                           |```9```   |Set the maximum search depth in proof search (default: 9) |
+|```--noTypeCheck```                              |          |If specified, show no type checking diagram for each sentence.|
+|```--noInference```                              |          |If specified, execute no inference for each discourse.|
+|```--time```                                     |          |Show the execution time in stderr.|
+|```--verbose```                                  |          |Show type infer/check logs in stderr.|
+>>>>>>> upmaster
+
 ### For developpers ###
 Installing Haskell-mode for Emacs will help.
 ```
-$ sudo apt-get install haskell-mode
+$ sudo apt install haskell-mode
 ```
 
 The following command creates an HTML document at: `<lightblue>/haddock/doc/html/lightblue/index.html`
@@ -132,5 +149,9 @@ $ stack build --haddock
 
 ## Contact ##
 
+<<<<<<< HEAD
 * Repo owner: [Daisuke Bekki](http://www.is.ocha.ac.jp/~bekki/)
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+=======
+* Repo owner: [Daisuke Bekki](https://daisukebekki.github.io/)
+>>>>>>> upmaster

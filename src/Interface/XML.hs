@@ -1,5 +1,4 @@
-{-# OPTIONS -Wall #-}
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 
 {-|
 Module      : Interface.XML
@@ -16,9 +15,11 @@ module Interface.XML (
   ) where
 
 import Prelude hiding (id)
-import qualified Data.Text.Lazy as T      -- text
-import qualified Control.Applicative as M -- base
-import qualified Control.Monad as M       -- base
+import qualified Data.Map as Map          --base
+import qualified Control.Applicative as M --base
+import qualified Control.Monad as M       --base
+import qualified Data.Text.Lazy as T      --text
+import qualified Text.XML as X            --xml-conduit
 import Parser.CCG
 import Interface.Text
 import Interface.HTML
@@ -75,10 +76,18 @@ node2XML i j iflexonly node =
                     let sid = "s" ++ (show i)
                     id <- traverseNode sid iflexonly True node
                     (cs,ts) <- popResults
-                    return $ T.concat $ header ++ (reverse ts) ++ (mediate sid id $ showScore node) ++ (reverse cs) ++ footer
+                    return $ prettifyXML $ T.concat $ header ++ (reverse ts) ++ (mediate sid id $ showScore node) ++ (reverse cs) ++ footer
   where header = ["<tokens>"]
         mediate sid id scor = ["</tokens><ccg score='", scor, "' id='", T.pack sid, "_ccg",T.pack $ show j,"' root='", id, "'>"]
         footer = ["</ccg>"]
+
+prettifyXML :: T.Text -> T.Text
+prettifyXML text =
+  X.renderText X.def { X.rsPretty = True } $ X.parseText_ X.def text
+
+--prettifyXML text =
+--  let opts = X.PrettifyOpts {X.indentStyle = X.SPACE 2, X.endOfLine = X.LF} in
+--  T.fromStrict $ X.prettyPrintXml opts $ X.toS text
 
 traverseNode :: String            -- ^ Sentence ID
                 -> Bool           -- ^ If True, only lexical items will be printed

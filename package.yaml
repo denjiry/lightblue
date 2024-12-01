@@ -1,20 +1,21 @@
-name:                lightblue
-version:             0.2.1.2
-description:         Please see the README on GitHub at <https://github.com/DaisukeBekki/lightblue#README.md>
-homepage:            https://github.com/DaisukeBekki/lightblue
-category:            CCG Parser, Higher-order Logic Prover
-synopsis:            A Japanese CCG parser with DTS
-license:             AllRightsReserved
-license-file:        LICENSE
-copyright:           Daisuke Bekki
-author:              Daisuke Bekki and Bekki Laboratory
-maintainer:          Daisuke Bekki
-stability:           beta
+name:         lightblue
+version:      0.3.4
+description:  Please see the README on GitHub at <https://github.com/DaisukeBekki/lightblue#README.md>
+homepage:     https://github.com/DaisukeBekki/lightblue
+category:     CCG Parser, Dependent Type Prover
+synopsis:     A Japanese CCG parser with DTS
+license:      AllRightsReserved
+license-file: LICENSE
+copyright:    Daisuke Bekki
+author:       Daisuke Bekki and Bekki Laboratory
+maintainer:   Daisuke Bekki
+stability:    beta
+ghc-options:  -Wall
 
 extra-source-files:
   - README.md
   - ChangeLog.md
-  - src/Parser/Japanese/Juman.dic
+  - src/Parser/Language/Japanese/Juman/Juman.dic
 
 dependencies:
   - base >= 4.8 && <5
@@ -22,18 +23,28 @@ dependencies:
   - time >= 1.4
   - text >= 1.2
   - process >= 1.2
-  - xml-conduit >= 1.3
+  - xml-conduit >= 1.9
   - optparse-applicative >= 0.13
   - semigroups >= 0.16
-  - jsem >= 0.0.0
+  - jsem >= 1.1
+  - nlp-tools >= 0.2.0
   - array >= 0.5.3.0
   - mtl >= 2.2.2
   - directory >=1.3.3.0
   - data-default
   - split
-  - aeson
   - hashmap
-  - bytestring
+  - aeson >= 1.0
+  - bytestring >= 0.10
+  - yaml >= 0.8.3
+  - hexpat >= 0.20
+  - parsec >= 3.1.14
+  - filepath >= 1.4
+  - shelly >= 1.8.1
+  - mtl >= 2.2.2
+  - serialise >= 0.2.4
+  - list-t >= 1.0.0.0
+  - store >= 0.7.14
 
 library:
   source-dirs: src
@@ -42,31 +53,62 @@ library:
   exposed-modules:
   - Parser.ChartParser
   - Parser.CCG
-  - Parser.Japanese.Lexicon
-  - Parser.Japanese.CallJuman
-  - Parser.Japanese.MyLexicon
-  - Parser.Japanese.Templates
+  - Parser.Language
+  - Parser.Language.Japanese.Lexicon
+  - Parser.Language.Japanese.MyLexicon
+  - Parser.Language.Japanese.Templates
+  - Parser.Language.Japanese.Juman.CallJuman
+  - Parser.Language.Japanese.Juman.Config  
+  - Parser.Language.Japanese.Juman.ParseJumanDic
+  - Parser.Language.Japanese.Juman.ParseCaseFrame
+  - Parser.Language.Japanese.Juman.ConvertJumanDic
+  - Parser.Language.Japanese.Juman.ShowCaseFrame
   - Interface
   - Interface.Text
   - Interface.TeX
   - Interface.XML
   - Interface.HTML
   - Interface.SVG
-  - DTS.DTT
+  - Interface.Tree
+  - DTS.Index
+  - DTS.GeneralTypeQuery
+  - DTS.UDTTdeBruijn
   - DTS.UDTTwithName
-  - DTS.UDTT
-  - DTS.Prover
-  - DTS.Prover.Judgement
-  - DTS.Prover.TypeChecker
-  - DTS.Prover_daido.Judgement
-  - DTS.Prover_daido.TypeChecker
-  - DTS.DTStoProlog
-  - DTS.Alligator.Arrowterm
-  - DTS.Alligator.ProofTree
+  - DTS.DTTdeBruijn
+  - DTS.DTTwithName
+  - DTS.QueryTypes
+  - DTS.TypeChecker
+  - DTS.NaturalLanguageInference
+  - DTS.Prover.Wani.WaniBase
+  - DTS.Prover.Wani.Forward
+  - DTS.Prover.Wani.Backward
+  - DTS.Prover.Wani.Arrowterm
+  - DTS.Prover.Wani.Prove
+#  - DTS.Prover.Coq.DTS2Coq
+#  - DTS.Prover.Diag.Prover
+#  - DTS.Prover.Diag.Judgement
+#  - DTS.Prover.Diag.TypeChecker
 
 executables:
   lightblue:
-    source-dirs: app
-    main: lightblueMain.hs
+    source-dirs:  app
+    main:         lightblueMain.hs
     ghc-options:  [-threaded, -rtsopts, -with-rtsopts=-N]
-    dependencies: lightblue >= 0.2.1.0
+    dependencies: lightblue
+  buildLexicion:
+    source-dirs:  app/Juman
+    main:         buildLexicon.hs
+    ghc-options:  [-threaded, -rtsopts, -with-rtsopts=-N]
+    dependencies: lightblue
+    
+tests:
+  testJumanDicSettings:
+    source-dirs:  test/Juman
+    main:         testJumanDicSettings.hs
+    ghc-options:  [-threaded, -rtsopts, -with-rtsopts=-N]
+    dependencies: lightblue
+  typeCheck:
+    source-dirs:  test/DTS
+    main:         testTypeChecker.hs
+    ghc-options:  [-threaded, -rtsopts, -with-rtsopts=-N]
+    dependencies: lightblue
