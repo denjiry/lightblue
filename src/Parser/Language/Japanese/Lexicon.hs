@@ -31,14 +31,12 @@ import qualified Data.Text.Lazy.IO as T --text
 import qualified Data.List as L          -- base
 import qualified Data.Map as M           -- base
 import Parser.CCG
-<<<<<<< HEAD:src/Parser/Japanese/Lexicon.hs
-import qualified Parser.Japanese.CallJuman as JU
-import qualified Parser.Japanese.MyLexicon as LEX
-import Parser.Japanese.Templates
-import DTS.UDTT
-import Data.HashMap (Map, lookup, empty, insertWith)
-import qualified Data.Maybe
-=======
+-- <<<<<<< HEAD:src/Parser/Japanese/Lexicon.hs
+-- import qualified Parser.Japanese.MyLexicon as LEX
+-- import DTS.UDTT
+-- import Data.HashMap (Map, lookup, empty, insertWith)
+-- import qualified Data.Maybe
+-- =======
 import qualified Parser.Language.Japanese.MyLexicon as LEX
 import Parser.Language.Japanese.Templates
 import qualified Parser.Language.Japanese.Juman.CallJuman as JU
@@ -50,7 +48,6 @@ type Signature = DTT.Signature
 
 terminator :: UDTT.Preterm
 terminator = UDTT.Ann (UDTT.Lam UDTT.Top) (DTT.Pi DTT.Entity DTT.Type)
->>>>>>> upmaster:src/Parser/Language/Japanese/Lexicon.hs
 
 -- | Lexicon consists of a set of CCG Nodes
 type LexicalItems = Map T.Text [Node]
