@@ -13,6 +13,7 @@ module DTS.DTTdeBruijn (
   -- * Terms and Types
   Selector(..)
   , Preterm(..)
+  , ConName
   -- * General Syntactic Operations
   , subst
   , shiftIndices
@@ -32,7 +33,7 @@ module DTS.DTTdeBruijn (
   ) where
 
 import qualified GHC.Generics as G    --base
-import qualified Data.Text.Lazy as T  --text
+import qualified Data.Text.Lazy as LazyT --text
 import Data.Store (Store(..))         --store
 import Data.Store.TH (makeStore)      --store
 import Interface.Text                 --lightblue
@@ -48,6 +49,8 @@ instance SimpleText Selector where
   toText Fst = "1"
   toText Snd = "2"
 
+type ConName = LazyT.Text
+
 -- instance Typeset Selector where
 --   toTeX = toText
 -- 
@@ -55,11 +58,13 @@ instance SimpleText Selector where
 --   toMathML Fst = "<mn>1</mn>"  -- `Proj` `Fst` m is the first projection of m
 --   toMathML Snd = "<mn>2</mn>" -- `Proj` `Snd` m is the second projection of m
 
+type ConName = LazyT.Text
+
 -- | Preterms of Dependent Type Theory (DTT).
 data Preterm = 
   -- | Basic Preterms
   Var Int                       -- ^ Variables
-  | Con T.Text                  -- ^ Constant symbols
+  | Con ConName                 -- ^ Constant symbols
   | Type                        -- ^ The sort \"type\"
   | Kind                        -- ^ The sort \"kind\"
   -- | Pi Types
@@ -84,51 +89,51 @@ data Preterm =
   | Nat                          -- ^ Natural number type (Nat)
   | Zero                         -- ^ 0 (of type Nat)
   | Succ Preterm                 -- ^ The successor function
-  | Natrec Preterm Preterm Preterm  -- ^ Natrec
+  | Natrec Preterm Preterm Preterm Preterm -- ^ Natrec
   -- | Intensional Equality Types
-  | Eq Preterm Preterm Preterm   -- ^ Intensional equality types
-  | Refl Preterm Preterm         -- ^ refl
-  | Idpeel Preterm Preterm       -- ^ idpeel
+  | Eq Preterm Preterm Preterm     -- ^ Intensional equality types
+  | Refl Preterm Preterm           -- ^ refl
+  | Idpeel Preterm Preterm Preterm -- ^ idpeel P E R
   -- | ToDo: add First Universe
   deriving (Eq, G.Generic)
 
+makeStore ''LazyT.Text
+
 instance Store Preterm
 
-makeStore ''T.Text
-
 instance Show Preterm where
-  show = T.unpack . toText
+  show = LazyT.unpack . toText
 
 -- | translates a preterm into a simple text notation.
 instance SimpleText Preterm where
   toText preterm = case preterm of
-    Var i   -> T.pack (show i)
+    Var i   -> LazyT.pack (show i)
     Con c   -> c
     Type    -> "type"
     Kind    -> "kind"
     Pi a b  -> case b of
-                 Bot -> T.concat["¬", toText a]
-                 b' -> T.concat["(Π ", toText a, ")", toText b']
-    Lam m   -> T.concat["λ.", toText m]
-    App m n -> T.concat["(", toText m, " ", toText n, ")"]
-    Not m   -> T.concat["¬", toText m]
-    Sigma a b  -> T.concat["(Σ ", toText a, ")", toText b]
-    Pair m n   -> T.concat["(", toText m, ",", toText n, ")"]
-    Proj s m   -> T.concat["π", toText s, "(", toText m, ")"]
-    Disj a b -> T.concat[toText a, " + ", toText b] 
-    Iota s m -> T.concat["ι", toText s, "(", toText m, ")"]
-    Unpack p l m n -> T.concat ["unpack(", toText p, ",", toText l, ",", toText m, ",", toText n, ")"]
+                 Bot -> LazyT.concat["¬", toText a]
+                 b' -> LazyT.concat["(Π ", toText a, ")", toText b']
+    Lam m   -> LazyT.concat["λ.", toText m]
+    App m n -> LazyT.concat["(", toText m, " ", toText n, ")"]
+    Not m   -> LazyT.concat["¬", toText m]
+    Sigma a b  -> LazyT.concat["(Σ ", toText a, ")", toText b]
+    Pair m n   -> LazyT.concat["(", toText m, ",", toText n, ")"]
+    Proj s m   -> LazyT.concat["π", toText s, "(", toText m, ")"]
+    Disj a b -> LazyT.concat[toText a, " + ", toText b] 
+    Iota s m -> LazyT.concat["ι", toText s, "(", toText m, ")"]
+    Unpack p l m n -> LazyT.concat ["unpack(", toText p, ",", toText l, ",", toText m, ",", toText n, ")"]
     Bot   -> "⊥"
     Unit  -> "()"
     Top   -> "T"
     Entity -> "entity"
     Nat   -> "N"
     Zero  -> "0"
-    Succ n -> T.concat ["s", toText n]
-    Natrec n e f -> T.concat ["natrec(", toText n, ",", toText e, ",", toText f, ")"]
-    Eq a m n -> T.concat [toText m, "=[", toText a, "]", toText n]
-    Refl a m -> T.concat ["refl", toText a, "(", toText m, ")"]
-    Idpeel m n -> T.concat ["idpeel(", toText m, ",", toText n, ")"]
+    Succ n -> LazyT.concat ["s", toText n]
+    Natrec p n e f -> LazyT.concat ["natrec(", toText p, ",", toText n, ",", toText e, ",", toText f, ")"]
+    Eq a m n -> LazyT.concat [toText m, "=[", toText a, "]", toText n]
+    Refl a m -> LazyT.concat ["refl", toText a, "(", toText m, ")"]
+    Idpeel p e r -> LazyT.concat ["idpeel(", toText p, ",", toText e, ",", toText r, ")"]
 
 -- | translates a DTS preterm into a tex source code.
 instance Typeset Preterm where
@@ -167,10 +172,10 @@ subst preterm l i = case preterm of
   Nat        -> Nat
   Zero       -> Zero
   Succ n     -> Succ (subst n l i)
-  Natrec n e f -> Natrec (subst n l i) (subst e l i) (subst f l i)
+  Natrec p n e f -> Natrec (subst p l i) (subst n l i) (subst e l i) (subst f l i)
   Eq a m n   -> Eq (subst a l i) (subst m l i) (subst n l i)
   Refl a m   -> Refl (subst a l i) (subst m l i)
-  Idpeel m n -> Idpeel (subst m l i) (subst n l i)
+  Idpeel p e r -> Idpeel (subst p l i) (subst e l i) (subst r l i)
 
 -- | shiftIndices m d i
 -- add d to all the indices that is greater than or equal to i within m (=d-place shift)
@@ -190,10 +195,10 @@ shiftIndices preterm d i = case preterm of
   Iota s m   -> Iota s (shiftIndices m d i)
   Unpack p l m n -> Unpack (shiftIndices p d i) (shiftIndices l d i) (shiftIndices m d i) (shiftIndices n d i)
   Succ n     -> Succ (shiftIndices n d i)
-  Natrec n e f -> Natrec (shiftIndices n d i) (shiftIndices e d i) (shiftIndices f d i)
+  Natrec p n e f -> Natrec (shiftIndices p d i) (shiftIndices n d i) (shiftIndices e d i) (shiftIndices f d i)
   Eq a m n   -> Eq (shiftIndices a d i) (shiftIndices m d i) (shiftIndices n d i)
   Refl a m   -> Refl (shiftIndices a d i) (shiftIndices m d i)
-  Idpeel m n -> Idpeel (shiftIndices m d i) (shiftIndices n d i)
+  Idpeel p e r -> Idpeel (shiftIndices p d i) (shiftIndices e d i) (shiftIndices r d i)
   m -> m
   
 
@@ -232,15 +237,15 @@ betaReduce preterm = case preterm of
   Nat  -> Nat
   Zero -> Zero
   Succ n -> Succ (betaReduce n)
-  Natrec n e f -> case betaReduce n of
-                    Zero -> betaReduce e
-                    Succ m -> betaReduce $ (App (App f m) (Natrec m e f))
-                    m -> Natrec m (betaReduce e) (betaReduce f) -- Con $ T.concat ["Error in beta-reduction of Natrec: ", toText n]
+  Natrec p n e f -> case betaReduce n of
+                      Zero -> betaReduce e
+                      Succ m -> betaReduce $ (App (App f m) (Natrec (betaReduce p) m (betaReduce e) (betaReduce f)))
+                      m -> Natrec (betaReduce p) m (betaReduce e) (betaReduce f) -- Con $ LazyT.concat ["Error in beta-reduction of Natrec: ", toText n]
   Eq a m n -> Eq (betaReduce a) (betaReduce m) (betaReduce n)
   Refl a m -> Refl (betaReduce a) (betaReduce m)
-  Idpeel m n -> case betaReduce m of
-                  Refl _ m' -> betaReduce $ (App n m')
-                  m' -> Idpeel m' (betaReduce n)
+  Idpeel p e r-> case betaReduce e of
+                   Refl _ m -> betaReduce $ App r m
+                   e' -> Idpeel (betaReduce p) e' (betaReduce r)
 
 -- | strong Beta reduction
 strongBetaReduce :: Int -> Preterm -> Preterm
@@ -277,15 +282,15 @@ strongBetaReduce t preterm = case preterm of
   Nat  -> Nat
   Zero -> Zero
   Succ n -> Succ (strongBetaReduce 0 n)
-  Natrec n e f -> case strongBetaReduce 0 n of
-                    Zero -> strongBetaReduce 0 e
-                    Succ m -> strongBetaReduce 0 $ (App (App f m) (Natrec m e f))
-                    m -> Natrec m (strongBetaReduce 0 e) (strongBetaReduce 0 f) -- Con $ T.concat ["Error in beta-reduction of Natrec: ", toText n]
+  Natrec p n e f -> case strongBetaReduce 0 n of
+                      Zero -> strongBetaReduce 0 e
+                      Succ m -> strongBetaReduce 0 $ (App (App f m) (Natrec (strongBetaReduce 0 p) m (strongBetaReduce 0 e) (strongBetaReduce 0 f)))
+                      m -> Natrec (strongBetaReduce 0 p) m (strongBetaReduce 0 e) (strongBetaReduce 0 f) -- Con $ LazyT.concat ["Error in beta-reduction of Natrec: ", toText n]
   Eq a m n -> Eq (strongBetaReduce 0 a) (strongBetaReduce 0 m) (strongBetaReduce 0 n)
   Refl a m -> Refl (strongBetaReduce 0 a) (strongBetaReduce 0 m)
-  Idpeel m n -> case strongBetaReduce 0 m of
-                  Refl _ m' -> strongBetaReduce 0 (App n m')
-                  m' -> Idpeel m' (strongBetaReduce 0 n)
+  Idpeel p e r -> case strongBetaReduce 0 e of
+                    Refl _ m -> strongBetaReduce 0 $ App r m
+                    e' -> Idpeel (strongBetaReduce 0 p) e' (strongBetaReduce 0 r)
 
 -- | eliminates nested Sigma constructions from a given preterm
 sigmaElimination :: Preterm -> Preterm
@@ -305,42 +310,42 @@ sigmaElimination preterm = case preterm of
   Iota s m   -> Iota s (sigmaElimination m)
   Unpack p l m n -> Unpack (sigmaElimination p) (sigmaElimination l) (sigmaElimination m) (sigmaElimination n)
   Succ n     -> Succ (sigmaElimination n)
-  Natrec n e f -> Natrec (sigmaElimination n) (sigmaElimination e) (sigmaElimination f)
+  Natrec p n e f -> Natrec (sigmaElimination p) (sigmaElimination n) (sigmaElimination e) (sigmaElimination f)
   Eq a m n   -> Eq (sigmaElimination a) (sigmaElimination m) (sigmaElimination n)
   Refl a m   -> Refl (sigmaElimination a) (sigmaElimination m)
-  Idpeel m n -> Idpeel (sigmaElimination m) (sigmaElimination n)
+  Idpeel p e r -> Idpeel (sigmaElimination p) (sigmaElimination e) (sigmaElimination r)
   m -> m
 
 -- | adds two preterms (of type `Nat`).
 add :: Preterm -> Preterm -> Preterm
-add m n = Natrec m n (Lam (Lam (Succ (Var 0))))
+add m n = Natrec (Lam Nat) m n (Lam (Lam (Succ (Var 0))))
 
 -- | multiplies two preterms (of type `Nat').
 multiply :: Preterm -> Preterm -> Preterm
-multiply m n = Natrec m Zero (Lam (Lam (add n (Var 0))))
+multiply m n = Natrec (Lam Nat) m Zero (Lam (Lam (add n (Var 0))))
 
 {- Judgment of DTT in de Bruijn notation -}
 
 -- | A type of an element of a type signature, that is, a list of pairs of a preterm and a type.
 -- ex. [entity:type, state:type, event:type, student:entity->type]
-type Signature = [(T.Text, Preterm)]
+type Signature = [(LazyT.Text, Preterm)]
 
 instance SimpleText Signature where
-  toText = (T.intercalate ", ") . (map (\(nm,tm) -> T.concat [nm, ":", toText tm])) . reverse
+  toText = (LazyT.intercalate ", ") . (map (\(nm,tm) -> LazyT.concat [nm, ":", toText tm])) . reverse
 instance Typeset Signature where
-  toTeX = (T.intercalate ",") . (map (\(nm,tm) -> T.concat [nm, ":", toTeX tm])) . reverse
+  toTeX = (LazyT.intercalate ",") . (map (\(nm,tm) -> LazyT.concat [nm, ":", toTeX tm])) . reverse
 instance MathML Signature where
-  toMathML = (T.intercalate "<mo>,<mo>") . (map (\(nm,tm) -> T.concat ["<mrow><mo>", nm, "</mo><mo>:</mo>", toMathML tm, "</mrow>"])) . reverse
+  toMathML = (LazyT.intercalate "<mo>,<mo>") . (map (\(nm,tm) -> LazyT.concat ["<mrow><mo>", nm, "</mo><mo>:</mo>", toMathML tm, "</mrow>"])) . reverse
 
 -- | A context is a list of preterms
 type Context = [Preterm]
 
 instance SimpleText Context where
-  toText = (T.intercalate ", ") . (map toText) . reverse
+  toText = (LazyT.intercalate ", ") . (map toText) . reverse
 instance Typeset Context where
-  toTeX = (T.intercalate ",") . (map toTeX) . reverse
+  toTeX = (LazyT.intercalate ",") . (map toTeX) . reverse
 instance MathML Context where
-  toMathML = (T.intercalate "<mo>,</mo>") . (map toMathML). reverse
+  toMathML = (LazyT.intercalate "<mo>,</mo>") . (map toMathML). reverse
 
 -- | The data type for a judgment
 data Judgment = Judgment {
@@ -354,7 +359,7 @@ embedJudgment :: Judgment -> GeneralTypeQuery Signature Context Preterm Preterm
 embedJudgment (Judgment sig cxt trm typ) = GeneralTypeQuery sig cxt (Term trm) (Term typ)
 
 instance Show Judgment where
-  show = T.unpack . toText
+  show = LazyT.unpack . toText
 instance SimpleText Judgment where
   toText = toText . embedJudgment
 instance Typeset Judgment where
@@ -374,7 +379,7 @@ embedTypeInferQuery :: TypeInferQuery -> GeneralTypeQuery Signature Context Pret
 embedTypeInferQuery (TypeInferQuery sig cxt trm) = GeneralTypeQuery sig cxt (Term trm) Question
 
 instance Show TypeInferQuery where
-  show = T.unpack . toText
+  show = LazyT.unpack . toText
 instance SimpleText TypeInferQuery where
   toText = toText . embedTypeInferQuery
 instance Typeset TypeInferQuery where
@@ -388,7 +393,7 @@ embedProofSearchQuery :: ProofSearchQuery -> GeneralTypeQuery Signature Context 
 embedProofSearchQuery (ProofSearchQuery sig cxt typ) = GeneralTypeQuery sig cxt Question (Term typ)
 
 instance Show ProofSearchQuery where
-  show = T.unpack . toText
+  show = LazyT.unpack . toText
 instance SimpleText ProofSearchQuery where
   toText = toText . embedProofSearchQuery
 instance Typeset ProofSearchQuery where

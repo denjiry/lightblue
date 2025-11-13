@@ -1,4 +1,4 @@
-{-# LANGUAGE  TypeSynonymInstances, FlexibleInstances  #-}
+{-# LANGUAGE  TypeSynonymInstances, FlexibleInstances, DeriveGeneric, DeriveAnyClass  #-}
 
 module DTS.Prover.Wani.Arrowterm
 (
@@ -7,6 +7,7 @@ module DTS.Prover.Wani.Arrowterm
   aVar,
   aCon,
   aType,
+  aEntityName,
   dt2Arrow,
   arrow2DT,
   arrowNotat,
@@ -36,10 +37,14 @@ module DTS.Prover.Wani.Arrowterm
   genFreeCon,
   isFreeCon,
   canBeSame,
+  canBeSame',
   addLam,
+  addLam',
+  rmLam,
   addApp,
   thereIsVar,
   varsInaTerm,
+  boundUpLim,
   betaReduce
 ) where
 
@@ -52,8 +57,11 @@ import qualified Data.List.Split as S
 import qualified Debug.Trace as D
 import qualified Interface.Tree as UDT
 import qualified DTS.QueryTypes as QT
+import qualified Data.Maybe as M
+import Data.Store (Store(..))
+import qualified GHC.Generics as G
 
-data ArrowSelector = ArrowFst | ArrowSnd deriving (Eq, Show)
+data ArrowSelector = ArrowFst | ArrowSnd deriving (Eq, Show, G.Generic, Store)
 -- | Arrowterm
 data Arrowterm =
   Conclusion DdB.Preterm -- ^ 末尾の部分
@@ -64,72 +72,90 @@ data Arrowterm =
   | ArrowLam Arrowterm -- ^ Lam型
   | Arrow AEnv  Arrowterm -- ^ Pi型
   | ArrowEq Arrowterm Arrowterm Arrowterm -- ^ 型 項1 項2 型
-  deriving (Eq)
+  | ArrowDisj Arrowterm Arrowterm
+  | ArrowIota ArrowSelector Arrowterm
+  | ArrowUnpack Arrowterm Arrowterm Arrowterm Arrowterm
+  deriving (Eq, G.Generic, Store)
 -- | DTT.Preterm型に変換して得たテキストを加工している
 instance Show Arrowterm where
-  show term  = prestr2arrowstr ((filter (/= ' ') . show . arrow2DT) term) term
+  show term  = show $ arrow2DT term -- prestr2arrowstr ((filter (/= ' ') . show . arrow2DT) term) term
 
 allReplace :: T.Text -> [(T.Text,T.Text)] -> T.Text
 allReplace base=foldr (\(from,to) str' -> T.replace from to str') base
 
+boundUpLim :: Arrowterm -> Int
+boundUpLim term =
+  case (betaReduce . arrowNotat) term of
+    Conclusion a -> 0
+    (ArrowSigma' a b) -> minimum $ (negate (length a) + boundUpLim b): map (\(num,a') -> (-num) +  boundUpLim a') (zip [0..] a)
+    (ArrowPair h t)-> minimum [boundUpLim h,boundUpLim t]
+    (ArrowApp a b) -> minimum[boundUpLim a,boundUpLim b]
+    (ArrowProj s p) -> boundUpLim p
+    (ArrowLam p) -> -1 + boundUpLim p
+    (Arrow a b) -> minimum $ (negate (length a) + boundUpLim b): map (\(num,a') -> (-num) +  boundUpLim a') (zip [0..] a)
+    (ArrowEq a b t) -> minimum [boundUpLim a,boundUpLim b]
+    (ArrowDisj a b) -> minimum [boundUpLim a,boundUpLim b]
+    (ArrowIota _ a) -> boundUpLim a
+    (ArrowUnpack a b c d) -> minimum $ map boundUpLim [a,b,c,d]
+
 -- | DTT.Preterm型に変換して得たテキストとArrowtermを比較して加工している
 prestr2arrowstr :: String -> Arrowterm -> String
-prestr2arrowstr prestr aTerm =
-    case aTerm of 
-      (Conclusion p) -> dropWhile (not . (`elem` (['0'..'z']++['(',')','\8869']))) prestr 
-      (Arrow env r) ->
-        if null env
-        then
-          prestr2arrowstr  prestr r
-        else
-          let parentheses =  take (length env) (treatParentheses prestr  '(' ')' ) 
-          in "[ " ++
-              tail
-                (foldr (
-                  (\ a b -> ", "  ++ a  ++ b) .
-                    (\z ->
-                      let str = (snd $ snd z)
-                      in takeWhile (/= ':')  str ++":" ++  prestr2arrowstr (tail $ dropWhile (/= ':') str) (fst z)))
-                  "" (zip (reverse env) parentheses)) ++
-              " ] => " ++ prestr2arrowstr  (tail $ drop ((fst . last) parentheses) prestr) r
-      (ArrowSigma' env r) ->
-        if null env
-        then
-          prestr2arrowstr  prestr r
-        else
-          let parentheses =  take (length env) (treatParentheses prestr  '(' ')' )
-          in "[ " ++
-              tail
-                (foldr (
-                  (\ a b -> ", "  ++ a  ++ b) .
-                    (\z ->
-                      let str = (snd $ snd z)
-                      in takeWhile (/= ':')  str ++":" ++  prestr2arrowstr (tail $ dropWhile (/= ':') str) (fst z)))
-                  "" (zip (reverse env) parentheses)) ++
-              " ] × " ++ prestr2arrowstr  (tail $ drop ((fst . last) parentheses) prestr) r
-      (ArrowApp h t) -> 
-        case treatParentheses prestr '(' ')' of
-          [(cnt,st)] -> 
-            let tPst = treatParentheses st '(' ')' 
-                args' = S.splitOn "," $T.unpack $allReplace (T.pack st) (map (\(num,str) -> (T.pack str,T.pack $ "(" ++ show num ++ ")")) tPst)
-                (arg:args)  = map (\str -> T.unpack $ allReplace (T.pack str) (map (\(num,inSide) -> (T.pack $ "(" ++ (show num) ++ ")" ,T.pack $inSide)) tPst)) args'
-                f = takeWhile (\ch -> ch /= '(') prestr
-                result =  "" ++ prestr2arrowstr (f ++ (if null args then "" else "(" ++ drop (1 + length arg) st ++ ")"))  h ++ ("(" ++prestr2arrowstr arg t++")")
-            in result
-          _ -> "表示エラー : " ++ prestr
-      (ArrowProj s t) -> 
-        let parentheses = head (treatParentheses prestr '(' ')' )
-        in take 2 prestr ++"(" ++ prestr2arrowstr (snd parentheses) t ++ ")"
-      (ArrowLam t) -> 
-        takeWhile (/= '.') prestr ++ ".(" ++ prestr2arrowstr  (tail $ dropWhile (/= '.') prestr) t ++")"
-      (ArrowPair h t) ->
-        let contents = init $ tail $prestr
-            trCon = treatParentheses contents  '(' ')' 
-            strs = S.splitOn "," $ T.unpack $ allReplace (T.pack contents) (map (\(num,str) -> (T.pack str,T.pack $ "(" ++ (show num) ++ ")")) trCon)
-            hstr:tstr = map (\str' -> T.unpack $ allReplace (T.pack str') (map (\(num,str) -> (T.pack $ "(" ++ (show num) ++ ")",T.pack str)) trCon)) strs 
-        in
-          "("++prestr2arrowstr hstr h++","++prestr2arrowstr (head tstr) t++")"
-      (ArrowEq a b t) -> prestr
+prestr2arrowstr prestr aTerm = undefined
+    -- case aTerm of 
+    --   (Conclusion p) -> dropWhile (not . (`elem` (['0'..'z']++['(',')','\8869']))) prestr 
+    --   (Arrow env r) ->
+    --     if null env
+    --     then
+    --       prestr2arrowstr  prestr r
+    --     else
+    --       let parentheses =  take (length env) (treatParentheses prestr  '(' ')' ) 
+    --       in "[ " ++
+    --           tail
+    --             (foldr (
+    --               (\ a b -> ", "  ++ a  ++ b) .
+    --                 (\z ->
+    --                   let str = (snd $ snd z)
+    --                   in takeWhile (/= ':')  str ++":" ++  prestr2arrowstr (tail $ dropWhile (/= ':') str) (fst z)))
+    --               "" (zip (reverse env) parentheses)) ++
+    --           " ] => " ++ prestr2arrowstr  (tail $ drop ((fst . last) parentheses) prestr) r
+    --   (ArrowSigma' env r) ->
+    --     if null env
+    --     then
+    --       prestr2arrowstr  prestr r
+    --     else
+    --       let parentheses =  take (length env) (treatParentheses prestr  '(' ')' )
+    --       in "[ " ++
+    --           tail
+    --             (foldr (
+    --               (\ a b -> ", "  ++ a  ++ b) .
+    --                 (\z ->
+    --                   let str = (snd $ snd z)
+    --                   in takeWhile (/= ':')  str ++":" ++  prestr2arrowstr (tail $ dropWhile (/= ':') str) (fst z)))
+    --               "" (zip (reverse env) parentheses)) ++
+    --           " ] × " ++ prestr2arrowstr  (tail $ drop ((fst . last) parentheses) prestr) r
+    --   (ArrowApp h t) -> 
+    --     case treatParentheses prestr '(' ')' of
+    --       [(cnt,st)] -> 
+    --         let tPst = treatParentheses st '(' ')' 
+    --             args' = S.splitOn "," $T.unpack $allReplace (T.pack st) (map (\(num,str) -> (T.pack str,T.pack $ "(" ++ show num ++ ")")) tPst)
+    --             (arg:args)  = map (\str -> T.unpack $ allReplace (T.pack str) (map (\(num,inSide) -> (T.pack $ "(" ++ (show num) ++ ")" ,T.pack $inSide)) tPst)) args'
+    --             f = takeWhile (\ch -> ch /= '(') prestr
+    --             result =  "" ++ prestr2arrowstr (f ++ (if null args then "" else "(" ++ drop (1 + length arg) st ++ ")"))  h ++ ("(" ++prestr2arrowstr arg t++")")
+    --         in result
+    --       _ -> "表示エラー : " ++ prestr
+    --   (ArrowProj s t) -> 
+    --     let parentheses = head (treatParentheses prestr '(' ')' )
+    --     in take 2 prestr ++"(" ++ prestr2arrowstr (snd parentheses) t ++ ")"
+    --   (ArrowLam t) -> 
+    --     takeWhile (/= '.') prestr ++ ".(" ++ prestr2arrowstr  (tail $ dropWhile (/= '.') prestr) t ++")"
+    --   (ArrowPair h t) ->
+    --     let contents = init $ tail $prestr
+    --         trCon = treatParentheses contents  '(' ')' 
+    --         strs = S.splitOn "," $ T.unpack $ allReplace (T.pack contents) (map (\(num,str) -> (T.pack str,T.pack $ "(" ++ (show num) ++ ")")) trCon)
+    --         hstr:tstr = map (\str' -> T.unpack $ allReplace (T.pack str') (map (\(num,str) -> (T.pack $ "(" ++ (show num) ++ ")",T.pack str)) trCon)) strs 
+    --     in
+    --       "("++prestr2arrowstr hstr h++","++prestr2arrowstr (head tstr) t++")"
+    --   (ArrowEq a b t) -> prestr
 
 -- | tP input :(u1:A)→(u2:B(u1))×C(u2,u1) output : [(6,"(u1:A)"),(17,"(u2:B(u1))"),(26,"(u2,u1)")]
 treatParentheses :: String -> Char -> Char  -> [(Int,String)]
@@ -153,8 +179,13 @@ dtNotatSelector :: ArrowSelector -> DdB.Selector
 dtNotatSelector ArrowFst = DdB.Fst
 dtNotatSelector ArrowSnd = DdB.Snd
 
+aEntityName = "Entity"
+
 arrow2DT :: Arrowterm -> (DdB.Preterm)
-arrow2DT (Conclusion a) = a
+arrow2DT (Conclusion a) = 
+  case a of 
+    DdB.Con conName -> if conName == aEntityName then DdB.Entity else a
+    _ -> a
 arrow2DT (ArrowSigma' [] t)= arrow2DT t
 arrow2DT (ArrowSigma' (f:r) t)= arrow2DT (ArrowSigma' r (Conclusion (DdB.Sigma (arrow2DT f)  (arrow2DT t))))
 arrow2DT (ArrowPair h t)= DdB.Pair (arrow2DT h) (arrow2DT t)
@@ -164,6 +195,9 @@ arrow2DT (ArrowLam p) = DdB.Lam (arrow2DT p)
 arrow2DT (Arrow [] t) = arrow2DT t
 arrow2DT (Arrow (f:r) t) = arrow2DT (Arrow r (Conclusion (DdB.Pi (arrow2DT f)  (arrow2DT t))))
 arrow2DT (ArrowEq a b t) = DdB.Eq (arrow2DT a) (arrow2DT b) (arrow2DT t)
+arrow2DT (ArrowDisj a b) = DdB.Disj (arrow2DT a) (arrow2DT b) 
+arrow2DT (ArrowIota h t) = DdB.Iota (dtNotatSelector h) (arrow2DT t)
+arrow2DT (ArrowUnpack a b c d) = DdB.Unpack (arrow2DT a) (arrow2DT b) (arrow2DT c) (arrow2DT d)
 
 thereIsVar :: Int -> Arrowterm -> Bool 
 thereIsVar num aTerm= case aTerm of
@@ -179,6 +213,9 @@ thereIsVar num aTerm= case aTerm of
     let arsLen = length ars
     in or $ zipWith (\num' a ->  thereIsVar (num + arsLen - num') a) [0..] (ar:ars)
   ArrowEq ar ar' ar2 -> any (thereIsVar num) [ar,ar',ar2]
+  ArrowDisj a b -> any (thereIsVar num) [a,b]
+  ArrowIota h t -> thereIsVar num t
+  ArrowUnpack a b c d -> any (thereIsVar num) [a,b,c,d]
 
 varsInaTerm :: Arrowterm -> [Int]
 varsInaTerm aTerm = L.nub $ varsInaTerm' 0 $arrowNotat aTerm
@@ -195,7 +232,9 @@ varsInaTerm' base aTerm =
     ArrowLam ar -> varsInaTerm' (base+1) ar
     Arrow ars ar -> concatMap (\(num,a) -> varsInaTerm' (base+num) a) (zip [0..] $reverse $ ar:ars)
     ArrowEq ar ar' ar2 -> concatMap (varsInaTerm' base) [ar,ar',ar2]  
-
+    ArrowDisj a b -> concatMap (varsInaTerm' base) [a,b]
+    ArrowIota h t -> varsInaTerm' base t
+    ArrowUnpack a b c d -> concatMap (varsInaTerm' base) [a,b,c,d]  -- ^ Unpack P L M N
 
 -- | 入力された(DdB.Preterm)をArrowTermに変換する
 dt2Arrow :: DdB.Preterm -> Arrowterm
@@ -203,6 +242,7 @@ dt2Arrow DdB.Type = Conclusion DdB.Type
 dt2Arrow (DdB.Var i) = Conclusion $ DdB.Var i
 dt2Arrow (DdB.Con i) = Conclusion $ DdB.Con i
 dt2Arrow (DdB.Not i) =Arrow [dt2Arrow i] $Conclusion DdB.Bot
+dt2Arrow (DdB.Entity) = Conclusion $ DdB.Con aEntityName
 dt2Arrow (DdB.Pi h t) =
   case dt2Arrow t of
     Arrow env t' -> Arrow (env ++ [dt2Arrow h]) t'
@@ -221,6 +261,9 @@ dt2Arrow (DdB.Lam p) =
   ArrowLam (dt2Arrow p)
 dt2Arrow (DdB.Eq a b t) =
   ArrowEq (dt2Arrow a) (dt2Arrow b) (dt2Arrow t)
+dt2Arrow (DdB.Disj a b) = ArrowDisj (dt2Arrow a) (dt2Arrow b)
+dt2Arrow (DdB.Iota h t) = ArrowIota (dtToArrowSelector h) (dt2Arrow t)
+dt2Arrow (DdB.Unpack a b c d) = ArrowUnpack (dt2Arrow a) (dt2Arrow b) (dt2Arrow c) (dt2Arrow d)
 dt2Arrow dt= Conclusion dt
 
 arrowNotat :: Arrowterm -> Arrowterm
@@ -244,7 +287,13 @@ betaReduce aterm = case aterm of
     ArrowLam ar -> ArrowLam (betaReduce ar)
     Arrow ars ar -> Arrow (map betaReduce ars) (betaReduce ar)
     ArrowEq ar ar' ar2 ->  ArrowEq (betaReduce ar) (betaReduce ar') (betaReduce ar2)
-
+    ArrowDisj a b -> ArrowDisj (betaReduce a) (betaReduce b)
+    ArrowIota h t -> ArrowIota h (betaReduce t)
+    ArrowUnpack p m n1 n2 -> 
+      case m of
+        ArrowIota ArrowFst m' -> betaReduce $ ArrowApp n1 m'
+        ArrowIota ArrowSnd m' -> betaReduce $ ArrowApp n2 m'
+        _ -> ArrowUnpack (betaReduce p) (betaReduce m) (betaReduce n1) (betaReduce n2)
 --  In `fromDT2A`, I use `DdB.toDTT` and `DdB.toUDTT` and the term convert into `(DdB.Preterm)` -> `(DdB.Preterm DdB.UDTT)` -> `(DdB.Preterm)`.
 --  This implementation let me using existed function, `DdB.betaReduce`.
 --  `A.betaReduce` is used to format a term about an list
@@ -306,12 +355,15 @@ subst preterm l i =
     case preterm of
       DdB.Pi a b -> DdB.Pi (subst a l i) (subst b (DdB.shiftIndices l 1 0)  (DdB.shiftIndices i 1 0))
       DdB.Not m -> DdB.Not (subst m l i)
-      DdB.Lam m -> DdB.Lam (subst m (DdB.shiftIndices l 1 0) (DdB.shiftIndices i 1 0))
+      DdB.Lam m -> DdB.Lam (subst m (DdB.shiftIndices l 1 ((boundUpLim . dt2Arrow) preterm)) (DdB.shiftIndices i 1 ((boundUpLim .dt2Arrow) preterm)))
       DdB.App m n    -> DdB.App (subst m l i) (subst n l i)
       DdB.Sigma a b  -> DdB.Sigma (subst a l i) (subst b (DdB.shiftIndices l 1 0) (DdB.shiftIndices i 1 0))
       DdB.Pair m n   -> DdB.Pair (subst m l i) (subst n l i)
       DdB.Proj s m   -> DdB.Proj s (subst m l i)
       DdB.Eq a m n   -> DdB.Eq (subst a l i) (subst m l i) (subst n l i)
+      DdB.Disj a b -> DdB.Disj (subst a l i) (subst b l i)
+      DdB.Iota h t -> DdB.Iota h (subst t l i)
+      DdB.Unpack a b c d -> DdB.Unpack (subst a l i) (subst b l i) (subst c l i) (subst d l i)
       others -> others
 
 arrowSubst :: Arrowterm -- ^ origin
@@ -379,6 +431,11 @@ canBeSame lim (  ArrowApp a1 a2) (  ArrowApp a1' a2')=
    canBeSame lim a1 a1' && canBeSame lim a2 a2'
 canBeSame lim (  ArrowProj s a) (  ArrowProj s' a') =
   s == s' && canBeSame lim a a'
+canBeSame lim ( ArrowProj _ _) a = 
+  case a of 
+    ArrowEq _ _ _ -> False
+    _ -> True
+  -- anum <= lim
 canBeSame lim (  ArrowPair a1 a2) (  ArrowPair a1' a2')=
   canBeSame lim a1 a1' && canBeSame lim a2 a2'
 canBeSame lim (  ArrowLam a) (  ArrowLam a') = canBeSame lim a a'
@@ -386,15 +443,57 @@ canBeSame lim (  Arrow con a) (  Arrow con' a') =
    all (\(num,(s,t)) -> canBeSame (lim+num) s t) (zip [0..] (zip (a:con) (a':con')))
 canBeSame lim (  ArrowEq a b t) (  ArrowEq a' b' t') =
   canBeSame lim a a' && canBeSame lim b b' && canBeSame lim t t'
+canBeSame lim (ArrowDisj a b) (ArrowDisj a' b') = canBeSame lim a a' && canBeSame lim b b'
+canBeSame lim (ArrowIota h t) (ArrowIota h' t') = h == h' && canBeSame lim t t'
+canBeSame lim (ArrowUnpack a b c d) (ArrowUnpack a' b' c' d') = canBeSame lim a a' && canBeSame lim b b' && canBeSame lim c c' && canBeSame lim d d'
 canBeSame lim other other' = False
 
+--形だけ比較
+canBeSame' :: Int ->   Arrowterm ->   Arrowterm -> [(Arrowterm,Arrowterm)]
+canBeSame' _ (  Conclusion DdB.Top) (  Conclusion DdB.Top) = []
+canBeSame' _ (  Conclusion DdB.Bot) (  Conclusion DdB.Bot) = []
+canBeSame' _ (  Conclusion DdB.Type) (  Conclusion DdB.Type) = []
+canBeSame' lim (  Conclusion (DdB.Var anum)) (  Conclusion (DdB.Var anum')) =[(aVar anum,aVar anum')]
+canBeSame' _ (Conclusion (DdB.Con t)) (Conclusion (DdB.Con t')) = [(aCon t,aCon t')]
+canBeSame' lim (  Conclusion (DdB.Var anum)) a = [(aVar anum,a)]
+canBeSame' lim a (  Conclusion (DdB.Var anum))  = [(a,aVar anum)]
+canBeSame' lim (  ArrowSigma' con a) (  ArrowSigma' con' a') =
+  concatMap (\(num,(s,t)) -> canBeSame' (lim+num) s t) (zip [0..] (zip (a:con) (a':con')))
+canBeSame' lim (  ArrowApp a1 a2) (  ArrowApp a1' a2')=
+   canBeSame' lim a1 a1' ++ canBeSame' lim a2 a2'
+canBeSame' lim (  ArrowProj s a) (  ArrowProj s' a') =
+  if s == s' then canBeSame' lim a a' else [(ArrowProj s a, ArrowProj s' a')]
+canBeSame' lim (  ArrowPair a1 a2) (  ArrowPair a1' a2')=
+  canBeSame' lim a1 a1' ++ canBeSame' lim a2 a2'
+canBeSame' lim (  ArrowLam a) (  ArrowLam a') = canBeSame' lim a a'
+canBeSame' lim (  Arrow con a) (  Arrow con' a') =
+   concatMap (\(num,(s,t)) -> canBeSame' (lim+num) s t) (zip [0..] (zip (a:con) (a':con')))
+canBeSame' lim (  ArrowEq a b t) (  ArrowEq a' b' t') =
+  canBeSame' lim a a' ++ canBeSame' lim b b' ++ canBeSame' lim t t'
+canBeSame' lim (ArrowDisj a b) (ArrowDisj a' b') = canBeSame' lim a a' ++ canBeSame' lim b b'
+canBeSame' lim (ArrowIota h t) (ArrowIota h' t') = if h == h' then canBeSame' lim t t' else []
+canBeSame' lim (ArrowUnpack a b c d) (ArrowUnpack a' b' c' d') = canBeSame' lim a a' ++ canBeSame' lim b b' ++ canBeSame' lim c c' ++ canBeSame' lim d d'
+canBeSame' lim other other' = [(other,other')]
+
 addApp ::Int -> Arrowterm -> Arrowterm
-addApp 0 base = base
-addApp num base = addApp (num - 1) $ ArrowApp (shiftIndices base 1 0) (Conclusion $ {-- DT.Var --} DdB.Var 0)
+-- addApp 0 base = base
+-- addApp num base = addApp (num - 1) $ ArrowApp (shiftIndices base 1 ((minimum $ varsInaTerm base) -1)) (Conclusion $ DdB.Var 0)
+addApp num base = foldl (\b a -> ArrowApp b (Conclusion $ DdB.Var a)) base $reverse [0..(num-1)]
 
 addLam :: Int -> Arrowterm -> Arrowterm
-addLam 0 term = term
-addLam num term = ArrowLam $ addLam (num - 1) term
+addLam num term =
+  if num > 0 then ArrowLam $ addLam (num - 1) (shiftIndices term 1 ((minimum $ varsInaTerm term) -1)) else term
+
+addLam' :: Int -> Arrowterm -> Arrowterm
+addLam' 0 term = term
+addLam' num term = ArrowLam $ addLam' (num - 1) term
+
+rmLam :: Int -> M.Maybe Arrowterm -> M.Maybe Arrowterm
+rmLam 0 term = term
+rmLam num term =
+  case term of
+    M.Just (ArrowLam a) -> maybe M.Nothing M.Just (rmLam (num-1) $ M.Just a)
+    _ -> M.Nothing
 
 sameCon :: Context -> Context -> Bool
 sameCon (sigCon1,varCon1) (sigCon2,varCon2) = 
