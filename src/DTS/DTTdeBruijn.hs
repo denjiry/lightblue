@@ -40,9 +40,12 @@ import Interface.Text                 --lightblue
 import Interface.TeX                  --lightblue
 import Interface.HTML                 --lightblue
 import DTS.GeneralTypeQuery           --lightblue
+import Data.Aeson (ToJSON)
 
 -- | 'Proj' 'Fst' m is the first projection of m, while 'Proj' 'Snd' m is the second projection of m.
 data Selector = Fst | Snd deriving (Eq, Show, G.Generic, Store)
+
+instance ToJSON Selector where
 
 -- | Print a selector as "1" or "2".
 instance SimpleText Selector where
@@ -57,8 +60,6 @@ type ConName = LazyT.Text
 -- instance MathML Selector where
 --   toMathML Fst = "<mn>1</mn>"  -- `Proj` `Fst` m is the first projection of m
 --   toMathML Snd = "<mn>2</mn>" -- `Proj` `Snd` m is the second projection of m
-
-type ConName = LazyT.Text
 
 -- | Preterms of Dependent Type Theory (DTT).
 data Preterm = 
@@ -96,6 +97,8 @@ data Preterm =
   | Idpeel Preterm Preterm Preterm -- ^ idpeel P E R
   -- | ToDo: add First Universe
   deriving (Eq, G.Generic)
+
+instance ToJSON Preterm where
 
 makeStore ''LazyT.Text
 

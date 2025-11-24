@@ -15,7 +15,6 @@ module Parser.Language.Japanese.Lexicon (
   --Node(..),
   LexicalItems
   , setupLexicon
-  , wholeLexicon
   , LEX.emptyCategories
   , LEX.myLexicon
   ) where
@@ -85,7 +84,6 @@ purifyText langOptions text =
                                         '８' -> '8'
                                         '９' -> '9') $ purifyText langOptions t  
                | otherwise                                 -> T.cons c $ purifyText langOptions t
->>>>>>> upstream/master
 
 -- | Read each line in "Juman.dic" and convert it to a CCG lexical item
 -- | Meanwhile, common nouns and proper names that have a same phonetic form are to be bundled together into a single word.

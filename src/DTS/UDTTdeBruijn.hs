@@ -47,10 +47,14 @@ import Interface.TeX                  --lightblue
 import Interface.HTML                 --lightblue
 import DTS.GeneralTypeQuery           --lightblue
 import qualified DTS.DTTdeBruijn  as DTTdB  --lightblue
+import Data.Aeson (ToJSON)
 -- import qualified DTS.UDTTwithName as UDTTwN --lightblue
 
 -- | 'Proj' 'Fst' m is the first projection of m, while 'Proj' 'Snd' m is the second projection of m.
 data Selector = Fst | Snd deriving (Eq, Show, G.Generic, Store)
+
+instance ToJSON Selector where
+
 
 -- | Print a selector as "1" or "2".
 instance SimpleText Selector where
@@ -105,6 +109,8 @@ data Preterm =
   | Ann Preterm DTTdB.Preterm         -- ^ Type annotation
   -- | ToDo: add First Universe
   deriving (Eq, G.Generic)
+
+instance ToJSON Preterm where
 
 instance Store Preterm
 
